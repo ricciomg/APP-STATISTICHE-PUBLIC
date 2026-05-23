@@ -732,8 +732,10 @@
 <script>
 // ═══ STATE ═══
 let state = JSON.parse(localStorage.getItem('courtstats4') || '{}');
-if(!state.roster)  state.roster  = [];
-if(!state.matches) state.matches = [];
+if(!state.roster)         state.roster         = [];
+if(!state.matches)        state.matches        = [];
+if(!state.deletedMatchIds)  state.deletedMatchIds  = [];
+if(!state.deletedPlayerIds) state.deletedPlayerIds = [];
 
 let liveMatch         = null;
 let selectedPlayerIdx = null;
@@ -784,7 +786,13 @@ function addPlayer() {
   document.getElementById('add-num').value='';
   renderRoster(); toast('Giocatore aggiunto ✓');
 }
-function deletePlayer(id) { state.roster=state.roster.filter(p=>p.id!==id); save(); renderRoster(); }
+function deletePlayer(id) {
+  if(id !== undefined && id !== null && !state.deletedPlayerIds.includes(id)) {
+    state.deletedPlayerIds.push(id);
+  }
+  state.roster = state.roster.filter(p => p.id !== id);
+  save(); renderRoster();
+}
 function renderRoster() {
   const list=document.getElementById('roster-list'), empty=document.getElementById('roster-empty');
   document.getElementById('roster-count').textContent=state.roster.length+' giocatori';
@@ -997,6 +1005,11 @@ function recordFT(made) {
   m.stats[p.id][q].fta++;
   if(made){ m.stats[p.id][q].ftm++; m.ourScore++; }
   addLog(p,made?'🎯':'⭕',made?'TL segnato (+1)':'TL sbagliato',q,{type:'ft',made,pts:made?1:0});
+  if(made) {
+    toast('🎯 '+p.name+': Tiro Libero Segnato +1', 2500);
+  } else {
+    toast('⭕ '+p.name+': Tiro Libero Sbagliato', 2500);
+  }
   save(); renderLive();
 }
 function recordStat(type) {
@@ -1090,9 +1103,21 @@ function deleteLogEntry(id) {
     else if(d.type==='shot2') {
       m.stats[pId][sk].fg2a=Math.max(0,m.stats[pId][sk].fg2a-1);
       if(d.made){ m.stats[pId][sk].fg2m=Math.max(0,m.stats[pId][sk].fg2m-1); m.ourScore=Math.max(0,m.ourScore-2); }
+      // Rimuove il punto dalla mappa tiri
+      if(d.sx!=null && d.sy!=null) {
+        const shots=m.stats[pId][sk].shots||[];
+        const idx=shots.findIndex(s=>s.pts===2&&s.made===d.made&&s.sx===d.sx&&s.sy===d.sy&&s.zone===d.zone);
+        if(idx>=0) shots.splice(idx,1);
+      }
     } else if(d.type==='shot3') {
       m.stats[pId][sk].fg3a=Math.max(0,m.stats[pId][sk].fg3a-1);
       if(d.made){ m.stats[pId][sk].fg3m=Math.max(0,m.stats[pId][sk].fg3m-1); m.ourScore=Math.max(0,m.ourScore-3); }
+      // Rimuove il punto dalla mappa tiri
+      if(d.sx!=null && d.sy!=null) {
+        const shots=m.stats[pId][sk].shots||[];
+        const idx=shots.findIndex(s=>s.pts===3&&s.made===d.made&&s.sx===d.sx&&s.sy===d.sy&&s.zone===d.zone);
+        if(idx>=0) shots.splice(idx,1);
+      }
     } else if(d.type==='ft') {
       m.stats[pId][sk].fta=Math.max(0,m.stats[pId][sk].fta-1);
       if(d.made){ m.stats[pId][sk].ftm=Math.max(0,m.stats[pId][sk].ftm-1); m.ourScore=Math.max(0,m.ourScore-1); }
@@ -1340,7 +1365,7 @@ function pickZone(evt, el) {
 
   m.stats[p.id][q].shots.push({pts,made,zone:el.dataset.zone,q,sx,sy});
   addLog(p,made?'✅':'❌',pts+'pt '+(made?'Segnato':'Sbagliato')+' — '+el.dataset.zone,q,
-    {type:deltaType,made,pts:made?pts:0});
+    {type:deltaType,made,pts:made?pts:0,sx,sy,zone:el.dataset.zone});
 
   // Show dot at exact click position
   const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
@@ -1403,39 +1428,37 @@ function exportReport() {
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Report — ${m.opponent} ${m.date}</title>
 <style>
-  *{box-sizing:border-box}
-  body{font-family:system-ui,sans-serif;background:#0a0a0f;color:#f0eee8;margin:0;padding:16px}
+  *{-webkit-box-sizing:border-box;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',system-ui,sans-serif;background:#0a0a0f;color:#f0eee8;margin:0;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom));-webkit-text-size-adjust:100%}
   h1{font-size:22px;margin:0 0 4px}
   h2{font-size:16px;color:#888;margin:20px 0 8px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #1c1c27;padding-bottom:4px}
   .meta{font-size:12px;color:#888;margin-bottom:16px}
   .score{font-size:48px;font-weight:900;letter-spacing:4px;color:${m.ourScore>m.oppScore?'#2ecc71':'#e74c3c'}}
-  .periods{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+  .periods{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin:12px 0}
+  .periods > *{margin:4px}
   .period{background:#1c1c27;border-radius:8px;padding:8px 12px;text-align:center;min-width:50px}
   .period-label{font-size:10px;color:#555;text-transform:uppercase}
   .period-pts{font-size:24px;font-weight:700;color:#f5a623}
-  /* Table base */
-  .scroll-wrap{overflow-x:auto;border-radius:10px;border:1px solid #1c1c27;margin-bottom:16px}
+  .scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid #1c1c27;margin-bottom:16px}
   table{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;margin:0}
   th{background:#1a1a26;color:#aaa;padding:8px 5px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
   td{padding:7px 5px;text-align:center;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap}
-  /* Alternating rows */
   tbody tr:nth-child(even) td{background:rgba(255,255,255,0.07)}
   tbody tr:nth-child(odd) td{background:transparent}
-  /* Alternating columns */
   th:nth-child(even){background:rgba(255,255,255,0.05) !important}
-  td:nth-child(even){box-shadow:inset 0 0 0 9999px rgba(255,255,255,0.04)}
-  /* Sticky first column — fully opaque backgrounds */
-  th:first-child{text-align:left;position:sticky;left:0;z-index:3;background:#1a1a26;border-right:2px solid rgba(255,255,255,0.15);min-width:110px}
-  td:first-child{text-align:left;font-weight:600;position:sticky;left:0;z-index:2;background:#0a0a0f;border-right:2px solid rgba(255,255,255,0.15)}
+  th:first-child{text-align:left;position:-webkit-sticky;position:sticky;left:0;z-index:3;background:#1a1a26;border-right:2px solid rgba(255,255,255,0.15);min-width:110px}
+  td:first-child{text-align:left;font-weight:600;position:-webkit-sticky;position:sticky;left:0;z-index:2;background:#0a0a0f;border-right:2px solid rgba(255,255,255,0.15)}
   tbody tr:nth-child(even) td:first-child{background:#111120 !important}
   tbody tr:nth-child(odd) td:first-child{background:#0a0a0f !important}
   .dim{color:#ccc;font-size:9px}
   .green{color:#2ecc71} .red{color:#e74c3c}
   .court-wrap{border-radius:12px;overflow:hidden;border:1px solid rgba(245,166,35,.15);margin-bottom:8px}
-  .legend{display:flex;gap:12px;padding:6px 12px;background:#1c1c27;font-size:11px;justify-content:center;flex-wrap:wrap}
+  .legend{display:-webkit-flex;display:flex;padding:6px 12px;background:#1c1c27;font-size:11px;-webkit-justify-content:center;justify-content:center;-webkit-flex-wrap:wrap;flex-wrap:wrap}
+  .legend > *{margin:3px 6px}
   .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px}
   .q-card{background:#13131a;border:1px solid rgba(245,166,35,.12);border-radius:10px;padding:12px;margin-bottom:12px}
   .q-title{font-size:16px;font-weight:700;color:#f5a623;margin-bottom:8px;letter-spacing:1px}
@@ -1603,8 +1626,9 @@ function updateExportMap() {
 
   if(_expTab === 'dots') {
     const dots = shots.map(s=>{
-      const cx=s.sx!=null?s.sx:(zoneDef[s.zone]?.x||461);
-      const cy=s.sy!=null?s.sy:(zoneDef[s.zone]?.y||300);
+      const zd=zoneDef[s.zone]||{};
+      const cx=s.sx!=null?s.sx:(zd.x||461);
+      const cy=s.sy!=null?s.sy:(zd.y||300);
       const col2 = s.made?'#2ecc71':'#e74c3c';
       return '<g>'
         +'<circle cx="'+cx+'" cy="'+cy+'" r="11" fill="'+col2+'" fill-opacity="0.15"/>'
@@ -1634,8 +1658,10 @@ function updateExportMap() {
       const stroke='rgba('+cr+','+cg+','+cb+',0.9)';
       const fs=24, fs2=22;
       return '<g><circle cx="'+def.x+'" cy="'+def.y+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="3"/>'+
-        '<text x="'+def.x+'" y="'+def.y+'" text-anchor="middle" dominant-baseline="middle" font-size="'+fs+'" font-weight="900" fill="white" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="3" paint-order="stroke">'+pctInt+'%</text>'+
-        '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="'+fs2+'" font-weight="800" fill="white" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="3" paint-order="stroke">'+z.made+'/'+z.total+'</text></g>';
+        '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="'+fs+'" font-weight="900" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+pctInt+'%</text>'+
+        '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="'+fs+'" font-weight="900" fill="white" font-family="sans-serif">'+pctInt+'%</text>'+
+        '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="'+fs2+'" font-weight="800" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+z.made+'/'+z.total+'</text>'+
+        '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="'+fs2+'" font-weight="800" fill="white" font-family="sans-serif">'+z.made+'/'+z.total+'</text></g>';
     }).join('');
     document.getElementById('exp-dots').innerHTML = bubbles;
     document.getElementById('exp-svg').querySelector('rect').setAttribute('fill','rgba(0,0,0,0.48)');
@@ -1653,10 +1679,10 @@ ${m.subs.length?`<h2>Sostituzioni</h2>
 <div style="margin-top:24px;font-size:10px;color:#333;text-align:center">Generato da CourtStats</div>
 
 <!-- Player panel -->
-<div id="pp" style="display:none;position:fixed;inset:0;z-index:300;background:#0a0a0f;overflow-y:auto">
-  <div style="background:#13131a;border-bottom:1px solid #222;padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
-    <div id="pp-num" style="font-family:monospace;font-size:44px;font-weight:900;color:#f5a623;line-height:1;min-width:58px;text-align:center">#0</div>
-    <div style="flex:1">
+<div id="pp" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:300;background:#0a0a0f;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div style="background:#13131a;border-bottom:1px solid #222;padding:14px 16px;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;position:-webkit-sticky;position:sticky;top:0;z-index:10">
+    <div id="pp-num" style="font-family:monospace;font-size:44px;font-weight:900;color:#f5a623;line-height:1;min-width:58px;text-align:center;margin-right:12px">#0</div>
+    <div style="-webkit-flex:1;flex:1">
       <div id="pp-name" style="font-size:20px;font-weight:700"></div>
     </div>
     <button onclick="closePP()" style="background:#1c1c27;border:1px solid #333;color:#f0eee8;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer">✕ Chiudi</button>
@@ -1724,19 +1750,22 @@ function showPlayer(pid) {
     const maxR=Math.min(def.rx,def.ry)*0.85;
     const r=Math.max(30,Math.round(maxR*(z.total/maxT)));
     const fill=bColor(pct), stroke=fill.substring(0,fill.lastIndexOf(','))+',0.9)';
+    // Use dy=".35em" instead of dominant-baseline for Safari; double text for stroke effect instead of paint-order
     return '<g><circle cx="'+def.x+'" cy="'+def.y+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="3"/>'+
-      '<text x="'+def.x+'" y="'+def.y+'" text-anchor="middle" dominant-baseline="middle" font-size="24" font-weight="900" fill="white" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="3" paint-order="stroke">'+pctInt+'%</text>'+
-      '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="22" font-weight="800" fill="white" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="3" paint-order="stroke">'+z.made+'/'+z.total+'</text></g>';
+      '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="24" font-weight="900" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+pctInt+'%</text>'+
+      '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="24" font-weight="900" fill="white" font-family="sans-serif">'+pctInt+'%</text>'+
+      '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="22" font-weight="800" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+z.made+'/'+z.total+'</text>'+
+      '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="22" font-weight="800" fill="white" font-family="sans-serif">'+z.made+'/'+z.total+'</text></g>';
   }).join('');
 
   const madeCount=shots.filter(s=>s.made).length;
   const tabStyle='flex:1;padding:7px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;';
 
   document.getElementById('pp-body').innerHTML=
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<div style="flex:1;background:#1c1c27;border:1px solid #333;border-radius:10px;padding:10px;text-align:center"><div style="font-size:26px;font-weight:900;color:#f5a623;line-height:1">'+pts+'</div><div style="font-size:9px;color:#555;text-transform:uppercase;margin-top:3px">Punti</div></div>'
-    +'<div style="flex:1;background:#1c1c27;border:1px solid #333;border-radius:10px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:900;color:#3498db;line-height:1">'+fg2m+'/'+fg2a+'</div><div style="font-size:9px;color:#555;text-transform:uppercase;margin-top:3px">2pt <span style="color:'+pC(fg2p)+'">'+fg2p+'%</span></div></div>'
-    +'<div style="flex:1;background:#1c1c27;border:1px solid #333;border-radius:10px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:900;color:#e8390e;line-height:1">'+fg3m+'/'+fg3a+'</div><div style="font-size:9px;color:#555;text-transform:uppercase;margin-top:3px">3pt <span style="color:'+pC(fg3p)+'">'+fg3p+'%</span></div></div>'
+    '<div style="display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin-bottom:14px">'
+    +'<div style="-webkit-flex:1;flex:1;background:#1c1c27;border:1px solid #333;border-radius:10px;padding:10px;text-align:center;margin:3px"><div style="font-size:26px;font-weight:900;color:#f5a623;line-height:1">'+pts+'</div><div style="font-size:9px;color:#555;text-transform:uppercase;margin-top:3px">Punti</div></div>'
+    +'<div style="-webkit-flex:1;flex:1;background:#1c1c27;border:1px solid #333;border-radius:10px;padding:10px;text-align:center;margin:3px"><div style="font-size:22px;font-weight:900;color:#3498db;line-height:1">'+fg2m+'/'+fg2a+'</div><div style="font-size:9px;color:#555;text-transform:uppercase;margin-top:3px">2pt <span style="color:'+pC(fg2p)+'">'+fg2p+'%</span></div></div>'
+    +'<div style="-webkit-flex:1;flex:1;background:#1c1c27;border:1px solid #333;border-radius:10px;padding:10px;text-align:center;margin:3px"><div style="font-size:22px;font-weight:900;color:#e8390e;line-height:1">'+fg3m+'/'+fg3a+'</div><div style="font-size:9px;color:#555;text-transform:uppercase;margin-top:3px">3pt <span style="color:'+pC(fg3p)+'">'+fg3p+'%</span></div></div>'
     +'</div>'
     +(shots.length>0
       ? '<div style="display:flex;background:#1c1c27;border-radius:10px;padding:3px;gap:3px;margin-bottom:10px">'
@@ -2032,12 +2061,16 @@ function renderShotMap(m, filterPlayerId, filterPeriod, prefix) {
     const fs2 = 22;
     return `<g>
       <circle cx="${cx}" cy="${cy}" r="${rScaled}" fill="${fill}" stroke="${stroke}" stroke-width="3"/>
-      <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle"
-        font-size="${fs}" font-weight="900" fill="white" font-family="sans-serif"
-        stroke="rgba(0,0,0,0.8)" stroke-width="3" paint-order="stroke">${pctInt}%</text>
+      <text x="${cx}" y="${cy}" dy=".35em" text-anchor="middle"
+        font-size="${fs}" font-weight="900" fill="rgba(0,0,0,0.8)" font-family="sans-serif"
+        stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">${pctInt}%</text>
+      <text x="${cx}" y="${cy}" dy=".35em" text-anchor="middle"
+        font-size="${fs}" font-weight="900" fill="white" font-family="sans-serif">${pctInt}%</text>
       <text x="${cx}" y="${cy+rScaled+20}" text-anchor="middle"
-        font-size="${fs2}" font-weight="800" fill="white" font-family="sans-serif"
-        stroke="rgba(0,0,0,0.8)" stroke-width="3" paint-order="stroke">${zs.made}/${zs.total}</text>
+        font-size="${fs2}" font-weight="800" fill="rgba(0,0,0,0.8)" font-family="sans-serif"
+        stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">${zs.made}/${zs.total}</text>
+      <text x="${cx}" y="${cy+rScaled+20}" text-anchor="middle"
+        font-size="${fs2}" font-weight="800" fill="white" font-family="sans-serif">${zs.made}/${zs.total}</text>
     </g>`;
   }).join('');
 
@@ -2628,6 +2661,11 @@ function confirmDeleteMatch(i) {
 
 function doDeleteMatch() {
   if(_deleteMatchIdx === null) return;
+  // Save tombstone so Drive merge never restores this match
+  const deletedId = state.matches[_deleteMatchIdx] && state.matches[_deleteMatchIdx].id;
+  if(deletedId && !state.deletedMatchIds.includes(deletedId)) {
+    state.deletedMatchIds.push(deletedId);
+  }
   // If deleting the live match, reset liveMatch
   if(liveMatch === _deleteMatchIdx) { liveMatch = null; }
   else if(liveMatch !== null && liveMatch > _deleteMatchIdx) { liveMatch--; }
@@ -2795,12 +2833,41 @@ async function driveSync() {
           try {
             const remote = await dl.json();
             let changed = false;
-            if (remote.matches && remote.matches.length > state.matches.length) {
-              state.matches = remote.matches; changed = true;
+
+            // Merge tombstones: unione degli ID cancellati da entrambi i lati
+            const allDeletedMatches  = Array.from(new Set([
+              ...(state.deletedMatchIds  || []),
+              ...(remote.deletedMatchIds  || [])
+            ]));
+            const allDeletedPlayers = Array.from(new Set([
+              ...(state.deletedPlayerIds || []),
+              ...(remote.deletedPlayerIds || [])
+            ]));
+            state.deletedMatchIds  = allDeletedMatches;
+            state.deletedPlayerIds = allDeletedPlayers;
+
+            // Merge matches: prendi tutte le partite remote non cancellate e non già presenti
+            if (remote.matches && remote.matches.length) {
+              const localIds = new Set(state.matches.map(m => m.id));
+              const toAdd = remote.matches.filter(m =>
+                !allDeletedMatches.includes(m.id) && !localIds.has(m.id)
+              );
+              // Rimuovi eventuali partite locali che sono nei tombstone remoti
+              state.matches = state.matches.filter(m => !allDeletedMatches.includes(m.id));
+              if (toAdd.length) { state.matches = state.matches.concat(toAdd); changed = true; }
+              else if (state.matches.length !== (state.matches.length + toAdd.length)) changed = true;
             }
-            if (remote.roster && remote.roster.length > state.roster.length) {
-              state.roster = remote.roster; changed = true;
+
+            // Merge roster: stessa logica
+            if (remote.roster && remote.roster.length) {
+              const localPids = new Set(state.roster.map(p => p.id));
+              const toAddP = remote.roster.filter(p =>
+                !allDeletedPlayers.includes(p.id) && !localPids.has(p.id)
+              );
+              state.roster = state.roster.filter(p => !allDeletedPlayers.includes(p.id));
+              if (toAddP.length) { state.roster = state.roster.concat(toAddP); changed = true; }
             }
+
             if (changed) {
               localStorage.setItem('courtstats4', JSON.stringify(state));
               renderRoster(); renderMatches();
