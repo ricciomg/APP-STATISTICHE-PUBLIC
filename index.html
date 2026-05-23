@@ -2646,29 +2646,70 @@ const DRIVE_CLIENT_ID = '643738223781-jp3g03u24hibj7nibca5dg9mp9mudt94.apps.goog
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const DRIVE_FILE_NAME = 'courtstats4_data.json';
 let driveToken = null;
+let driveTokenExpiry = 0;       // timestamp ms quando scade
 let driveFileId = localStorage.getItem('driveFileId') || null;
 let driveSyncing = false;
+let driveEnabled = localStorage.getItem('driveEnabled') === '1';
+let _driveTokenClient = null;
 
-function driveToggle() {
-  if (driveToken) { driveDisconnect(); }
-  else { driveConnect(); }
+// Ottieni/rinnova il token in modo silenzioso; chiama callback(token) o callback(null)
+function driveGetToken(callback) {
+  const now = Date.now();
+  // Token ancora valido (con 2 min di margine)
+  if (driveToken && driveTokenExpiry - now > 120000) { callback(driveToken); return; }
+
+  if (typeof google === 'undefined') { callback(null); return; }
+
+  if (!_driveTokenClient) {
+    _driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: DRIVE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      prompt: '',   // nessun popup se già autorizzato
+      callback: (resp) => {
+        if (resp.error || !resp.access_token) {
+          // Se il refresh silenzioso fallisce, chiedi login esplicito
+          if (resp.error === 'interaction_required' || resp.error === 'login_required') {
+            driveEnabled = false;
+            localStorage.removeItem('driveEnabled');
+            driveUpdateUI(false);
+            toast('⚠️ Sessione Drive scaduta — ripremi ☁ Drive per riconnetterti');
+          }
+          callback(null); return;
+        }
+        driveToken = resp.access_token;
+        driveTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
+        callback(driveToken);
+      }
+    });
+  }
+  // Richiesta silenziosa (non mostra popup se già autorizzato)
+  _driveTokenClient.requestAccessToken({ prompt: '' });
 }
 
-function driveConnect() {
-  if (typeof google === 'undefined') { toast('Google SDK non ancora caricato, riprova'); return; }
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: DRIVE_CLIENT_ID,
-    scope: DRIVE_SCOPE,
-    callback: (resp) => {
-      if (resp.error) { toast('Errore autenticazione: ' + resp.error); return; }
-      driveToken = resp.access_token;
-      localStorage.setItem('driveToken', driveToken);
-      driveUpdateUI(true);
-      driveSync();
-      toast('✅ Connesso a Google Drive');
-    }
-  });
-  client.requestAccessToken();
+function driveToggle() {
+  if (driveEnabled) { driveDisconnect(); }
+  else { driveConnectExplicit(); }
+}
+
+function driveConnectExplicit() {
+  if (typeof google === 'undefined') { toast('Google SDK non ancora caricato, riprova tra un secondo'); return; }
+  if (!_driveTokenClient) {
+    _driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: DRIVE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (resp) => {
+        if (resp.error || !resp.access_token) { toast('Errore autenticazione: ' + (resp.error||'unknown')); return; }
+        driveToken = resp.access_token;
+        driveTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
+        driveEnabled = true;
+        localStorage.setItem('driveEnabled', '1');
+        driveUpdateUI(true);
+        driveSync();
+        toast('✅ Connesso a Google Drive — dati al sicuro!');
+      }
+    });
+  }
+  _driveTokenClient.requestAccessToken({ prompt: 'consent' });
 }
 
 function driveDisconnect() {
@@ -2676,7 +2717,8 @@ function driveDisconnect() {
     google.accounts.oauth2.revoke(driveToken, () => {});
   }
   driveToken = null;
-  localStorage.removeItem('driveToken');
+  driveEnabled = false;
+  localStorage.removeItem('driveEnabled');
   driveUpdateUI(false);
   toast('Disconnesso da Google Drive');
 }
@@ -2700,106 +2742,133 @@ function driveUpdateUI(connected) {
   }
 }
 
-function driveSyncStatus(syncing) {
+function driveSyncStatus(syncing, error) {
   const dot = document.getElementById('drive-dot');
   const txt = document.getElementById('drive-status-text');
   if (!dot) return;
   if (syncing) {
     dot.className = 'drive-dot drive-dot-sync';
     txt.textContent = 'Sincronizzazione…';
+  } else if (error) {
+    dot.className = 'drive-dot';
+    dot.style.background = '#e74c3c';
+    txt.textContent = '⚠️ Errore sync';
   } else {
     dot.className = 'drive-dot drive-dot-ok';
+    dot.style.background = '';
     const d = new Date();
-    txt.textContent = 'Sincronizzato ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+    txt.textContent = 'Sincronizzato alle ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
   }
 }
 
 async function driveSync() {
-  if (!driveToken || driveSyncing) return;
+  if (!driveEnabled || driveSyncing) return;
   driveSyncing = true;
   driveSyncStatus(true);
-  try {
-    // Search for existing file in appDataFolder
-    if (!driveFileId) {
-      const search = await fetch(
-        'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%22' + DRIVE_FILE_NAME + '%22&fields=files(id)',
-        { headers: { Authorization: 'Bearer ' + driveToken } }
-      );
-      const sData = await search.json();
-      if (sData.files && sData.files.length > 0) {
-        driveFileId = sData.files[0].id;
-        localStorage.setItem('driveFileId', driveFileId);
-      }
-    }
 
-    if (driveFileId) {
-      // Download remote data and merge (remote wins for matches, local wins for roster)
-      const dl = await fetch(
-        'https://www.googleapis.com/drive/v3/files/' + driveFileId + '?alt=media',
-        { headers: { Authorization: 'Bearer ' + driveToken } }
-      );
-      if (dl.ok) {
-        const remote = await dl.json();
-        // Simple merge: keep most matches
-        if (remote.matches && remote.matches.length > state.matches.length) {
-          state.matches = remote.matches;
-        }
-        if (remote.roster && remote.roster.length > state.roster.length) {
-          state.roster = remote.roster;
-        }
-        save();
-        renderRoster();
-        renderMatches();
-      }
-    }
+  driveGetToken(async (token) => {
+    if (!token) { driveSyncing = false; driveSyncStatus(false, true); return; }
 
-    // Upload current state
-    const body = JSON.stringify(state);
-    let response;
-    if (driveFileId) {
-      response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files/' + driveFileId + '?uploadType=media',
-        { method: 'PATCH', headers: { Authorization: 'Bearer ' + driveToken, 'Content-Type': 'application/json' }, body }
-      );
-    } else {
-      // Create new file
-      const meta = { name: DRIVE_FILE_NAME, parents: ['appDataFolder'] };
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-      form.append('file', new Blob([body], { type: 'application/json' }));
-      response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-        { method: 'POST', headers: { Authorization: 'Bearer ' + driveToken }, body: form }
-      );
-      if (response.ok) {
-        const d = await response.json();
-        driveFileId = d.id;
-        localStorage.setItem('driveFileId', driveFileId);
+    try {
+      // Cerca file esistente
+      if (!driveFileId) {
+        const search = await fetch(
+          'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%22' + DRIVE_FILE_NAME + '%22&fields=files(id)',
+          { headers: { Authorization: 'Bearer ' + token } }
+        );
+        if (search.status === 401) { driveToken = null; driveSyncing = false; driveSync(); return; }
+        const sData = await search.json();
+        if (sData.files && sData.files.length > 0) {
+          driveFileId = sData.files[0].id;
+          localStorage.setItem('driveFileId', driveFileId);
+        }
       }
+
+      // Scarica e mergia dati remoti
+      if (driveFileId) {
+        const dl = await fetch(
+          'https://www.googleapis.com/drive/v3/files/' + driveFileId + '?alt=media',
+          { headers: { Authorization: 'Bearer ' + token } }
+        );
+        if (dl.status === 401) { driveToken = null; driveSyncing = false; driveSync(); return; }
+        if (dl.ok) {
+          try {
+            const remote = await dl.json();
+            let changed = false;
+            if (remote.matches && remote.matches.length > state.matches.length) {
+              state.matches = remote.matches; changed = true;
+            }
+            if (remote.roster && remote.roster.length > state.roster.length) {
+              state.roster = remote.roster; changed = true;
+            }
+            if (changed) {
+              localStorage.setItem('courtstats4', JSON.stringify(state));
+              renderRoster(); renderMatches();
+            }
+          } catch(e) { /* file corrotto remoto, sovrascriviamo */ }
+        }
+      }
+
+      // Carica stato corrente
+      const body = JSON.stringify(state);
+      let response;
+      if (driveFileId) {
+        response = await fetch(
+          'https://www.googleapis.com/upload/drive/v3/files/' + driveFileId + '?uploadType=media',
+          { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body }
+        );
+      } else {
+        const meta = { name: DRIVE_FILE_NAME, parents: ['appDataFolder'] };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+        form.append('file', new Blob([body], { type: 'application/json' }));
+        response = await fetch(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+          { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: form }
+        );
+        if (response.ok) {
+          const d = await response.json();
+          driveFileId = d.id;
+          localStorage.setItem('driveFileId', driveFileId);
+        }
+      }
+
+      if (response && response.status === 401) {
+        // Token scaduto durante l'upload — azzera e riprova
+        driveToken = null; driveSyncing = false; driveSync(); return;
+      }
+
+      driveSyncStatus(false);
+    } catch(e) {
+      console.error('Drive sync error', e);
+      driveSyncStatus(false, true);
     }
-    driveSyncStatus(false);
-  } catch(e) {
-    console.error('Drive sync error', e);
-    toast('Errore sync Drive');
-    driveSyncStatus(false);
-  }
-  driveSyncing = false;
+    driveSyncing = false;
+  });
 }
 
-// Override save() to also trigger Drive sync
+// Override save() per triggerare sync automatico con debounce 3s
 const _origSave = save;
 function save() {
   localStorage.setItem('courtstats4', JSON.stringify(state));
-  if (driveToken) { clearTimeout(save._driveTimer); save._driveTimer = setTimeout(driveSync, 3000); }
+  if (driveEnabled) { clearTimeout(save._driveTimer); save._driveTimer = setTimeout(driveSync, 3000); }
 }
 
-// Auto-reconnect on load if token was saved
+// Rinnovo token preventivo ogni 50 minuti (token dura 60 min)
+setInterval(() => { if (driveEnabled) { driveToken = null; driveSync(); } }, 50 * 60 * 1000);
+
+// Auto-reconnect silenzioso se era attivo
 (function() {
-  const savedToken = localStorage.getItem('driveToken');
-  if (savedToken) {
-    driveToken = savedToken;
-    driveUpdateUI(true);
-    driveSync();
+  if (driveEnabled) {
+    // Aspetta che Google SDK sia caricato
+    const wait = setInterval(() => {
+      if (typeof google !== 'undefined') {
+        clearInterval(wait);
+        driveUpdateUI(true);
+        driveSync();
+      }
+    }, 500);
+    setTimeout(() => clearInterval(wait), 10000); // timeout 10s
   }
 })();
 
