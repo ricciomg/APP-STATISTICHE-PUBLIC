@@ -1078,6 +1078,13 @@ function recordStat(type) {
     const fc = getFoulCount(state.matches[liveMatch], p);
     const warn = fc>=5?' — FUORI!':fc>=4?' — ATTENZIONE!':'';
     toast('✋ '+p.name+': '+fc+' fallo'+(fc>1?'i':'')+warn, 3000);
+  } else if(type==='foul_drawn') {
+    // handled below with opp modal
+  } else {
+    // Generic confirmation toast with running total
+    const allQks = ['q1','q2','q3','q4','ot'];
+    const total = allQks.reduce((sum, k) => sum + (m.stats[p.id]?.[k]?.[type] || 0), 0);
+    toast(I[type]+' '+p.name+': '+L[type]+' ('+total+')', 2000);
   }
   save(); renderLive();
   renderFoulStrip();
@@ -2518,16 +2525,21 @@ function renderFoulStrip() {
   const m  = state.matches[liveMatch];
   const qk = m.isOT?'ot':'q'+m.quarter;
 
-  // OUR fouls this quarter
-  let ourQ = 0;
+  // OUR fouls this quarter + total match
+  let ourQ = 0, ourTot = 0;
+  const allQks = ['q1','q2','q3','q4','ot'];
   m.players.forEach(p=>{
     const s = m.stats[p.id]?.[qk];
     if(s) ourQ += (s.foul||0);
+    allQks.forEach(k=>{ const sq = m.stats[p.id]?.[k]; if(sq) ourTot += (sq.foul||0); });
   });
 
-  // OPP fouls this quarter
-  let oppQ = 0;
-  Object.values(m.oppFouls||{}).forEach(fd=>{ oppQ += (fd[qk]||0); });
+  // OPP fouls this quarter + total match
+  let oppQ = 0, oppTot = 0;
+  Object.values(m.oppFouls||{}).forEach(fd=>{
+    oppQ += (fd[qk]||0);
+    allQks.forEach(k=>{ oppTot += (fd[k]||0); });
+  });
 
   // Render dots for our fouls
   const ourEl = document.getElementById('our-fouls-strip');
@@ -2541,8 +2553,9 @@ function renderFoulStrip() {
     }).join('') + (count>8?`<span style="font-size:10px;color:var(--text2)"> +${count-8}</span>`:'');
   }
 
-  ourEl.innerHTML = `<span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${ourQ>=5?'var(--red)':ourQ>=4?'var(--accent)':'var(--text)'};margin-right:4px">${ourQ}</span>` + foulDots(ourQ, 5);
-  oppEl.innerHTML = `<span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${oppQ>=5?'var(--red)':oppQ>=4?'var(--accent)':'var(--text)'};margin-right:4px">${oppQ}</span>` + foulDots(oppQ, 5);
+  const totStyle = `font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-left:5px;white-space:nowrap`;
+  ourEl.innerHTML = `<span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${ourQ>=5?'var(--red)':ourQ>=4?'var(--accent)':'var(--text)'};margin-right:4px">${ourQ}</span>` + foulDots(ourQ, 5) + `<span style="${totStyle}">(${ourTot} tot)</span>`;
+  oppEl.innerHTML = `<span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${oppQ>=5?'var(--red)':oppQ>=4?'var(--accent)':'var(--text)'};margin-right:4px">${oppQ}</span>` + foulDots(oppQ, 5) + `<span style="${totStyle}">(${oppTot} tot)</span>`;
 }
 
 
