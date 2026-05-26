@@ -1617,8 +1617,10 @@ ${(()=>{
 </div>
 <div class="court-wrap" id="exp-map-wrap">
   <svg id="exp-svg" viewBox="0 0 923 569" style="width:100%;display:block" xmlns="http://www.w3.org/2000/svg">
-    <image href="${courtImg}" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>
-    <rect x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.22)"/>
+    <g transform="scale(1,-1) translate(0,-569)">
+      <image href="${courtImg}" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>
+      <rect id="exp-overlay" x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.22)"/>
+    </g>
     <g id="exp-dots"></g>
   </svg>
   <div class="legend" id="exp-legend"></div>
@@ -1848,8 +1850,10 @@ function showPlayer(pid) {
         +'<div id="pp-dots">'
         +'<div style="border-radius:12px;overflow:hidden;border:1px solid rgba(245,166,35,.15);margin-bottom:8px">'
         +'<svg viewBox="0 0 923 569" style="width:100%;display:block" xmlns="http://www.w3.org/2000/svg">'
+        +'<g transform="scale(1,-1) translate(0,-569)">'
         +'<image href="'+courtImg+'" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>'
         +'<rect x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.22)"/>'
+        +'</g>'
         +dots+'</svg>'
         +'<div style="display:flex;gap:12px;padding:6px 12px;background:#1c1c27;font-size:11px;justify-content:center">'
         +'<span style="color:#2ecc71">● Segnato</span><span style="color:#e74c3c">● Sbagliato</span>'
@@ -1857,8 +1861,10 @@ function showPlayer(pid) {
         +'<div id="pp-bubble" style="display:none">'
         +'<div style="border-radius:12px;overflow:hidden;border:1px solid rgba(245,166,35,.15);margin-bottom:8px">'
         +'<svg viewBox="0 0 923 569" style="width:100%;display:block" xmlns="http://www.w3.org/2000/svg">'
+        +'<g transform="scale(1,-1) translate(0,-569)">'
         +'<image href="'+courtImg+'" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>'
         +'<rect x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.48)"/>'
+        +'</g>'
         +bubbles+'</svg></div></div>'
       : '<div style="color:#555;text-align:center;padding:20px">Nessun tiro registrato</div>');
 
@@ -2191,8 +2197,10 @@ function renderShotMap(m, filterPlayerId, filterPeriod, prefix) {
             <filter id="glow-g"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
             <filter id="glow-r"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           </defs>
-          <image href="${courtImg}" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>
-          <rect x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.22)"/>
+          <g transform="scale(1,-1) translate(0,-569)">
+            <image href="${courtImg}" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>
+            <rect x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.22)"/>
+          </g>
           ${dots}
         </svg>
         <div style="display:flex;gap:16px;padding:7px 12px;background:var(--surface2);justify-content:center;flex-wrap:wrap">
@@ -2207,8 +2215,10 @@ function renderShotMap(m, filterPlayerId, filterPeriod, prefix) {
     <div id="${px}shotmap-bubble" style="display:none">
       <div style="margin:0 16px 8px;border-radius:12px;overflow:hidden;border:1px solid var(--border);cursor:zoom-in" ondblclick="openZoomMap('${px}shotmap-bubble','Mappa a Bolle')" title="Doppio tap per ingrandire">
         <svg viewBox="0 0 923 569" style="width:100%;display:block" xmlns="http://www.w3.org/2000/svg">
-          <image href="${courtImg}" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>
-          <rect x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.48)"/>
+          <g transform="scale(1,-1) translate(0,-569)">
+            <image href="${courtImg}" x="0" y="0" width="923" height="569" preserveAspectRatio="xMidYMid meet"/>
+            <rect x="0" y="0" width="923" height="569" fill="rgba(0,0,0,0.48)"/>
+          </g>
           ${bubbles}
         </svg>
         <div style="display:flex;gap:10px;padding:7px 12px;background:var(--surface2);justify-content:center;flex-wrap:wrap;align-items:center">
