@@ -1732,11 +1732,12 @@ function updateExportMap() {
       const fill='rgba('+cr+','+cg+','+cb+','+ca+')';
       const stroke='rgba('+cr+','+cg+','+cb+',0.9)';
       const fs=24, fs2=22;
-      return '<g><circle cx="'+def.x+'" cy="'+def.y+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="3"/>'+
-        '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="'+fs+'" font-weight="900" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+pctInt+'%</text>'+
-        '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="'+fs+'" font-weight="900" fill="white" font-family="sans-serif">'+pctInt+'%</text>'+
-        '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="'+fs2+'" font-weight="800" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+z.made+'/'+z.total+'</text>'+
-        '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="'+fs2+'" font-weight="800" fill="white" font-family="sans-serif">'+z.made+'/'+z.total+'</text></g>';
+      const cy=569-def.y;
+      return '<g><circle cx="'+def.x+'" cy="'+cy+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="3"/>'+
+        '<text x="'+def.x+'" y="'+cy+'" dy=".35em" text-anchor="middle" font-size="'+fs+'" font-weight="900" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+pctInt+'%</text>'+
+        '<text x="'+def.x+'" y="'+cy+'" dy=".35em" text-anchor="middle" font-size="'+fs+'" font-weight="900" fill="white" font-family="sans-serif">'+pctInt+'%</text>'+
+        '<text x="'+def.x+'" y="'+(cy+r+22)+'" text-anchor="middle" font-size="'+fs2+'" font-weight="800" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+z.made+'/'+z.total+'</text>'+
+        '<text x="'+def.x+'" y="'+(cy+r+22)+'" text-anchor="middle" font-size="'+fs2+'" font-weight="800" fill="white" font-family="sans-serif">'+z.made+'/'+z.total+'</text></g>';
     }).join('');
     document.getElementById('exp-dots').innerHTML = bubbles;
     document.getElementById('exp-svg').querySelector('rect').setAttribute('fill','rgba(0,0,0,0.48)');
@@ -1826,11 +1827,12 @@ function showPlayer(pid) {
     const r=Math.max(30,Math.round(maxR*(z.total/maxT)));
     const fill=bColor(pct), stroke=fill.substring(0,fill.lastIndexOf(','))+',0.9)';
     // Use dy=".35em" instead of dominant-baseline for Safari; double text for stroke effect instead of paint-order
-    return '<g><circle cx="'+def.x+'" cy="'+def.y+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="3"/>'+
-      '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="24" font-weight="900" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+pctInt+'%</text>'+
-      '<text x="'+def.x+'" y="'+def.y+'" dy=".35em" text-anchor="middle" font-size="24" font-weight="900" fill="white" font-family="sans-serif">'+pctInt+'%</text>'+
-      '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="22" font-weight="800" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+z.made+'/'+z.total+'</text>'+
-      '<text x="'+def.x+'" y="'+(def.y+r+22)+'" text-anchor="middle" font-size="22" font-weight="800" fill="white" font-family="sans-serif">'+z.made+'/'+z.total+'</text></g>';
+    const cy=569-def.y;
+    return '<g><circle cx="'+def.x+'" cy="'+cy+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="3"/>'+
+      '<text x="'+def.x+'" y="'+cy+'" dy=".35em" text-anchor="middle" font-size="24" font-weight="900" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+pctInt+'%</text>'+
+      '<text x="'+def.x+'" y="'+cy+'" dy=".35em" text-anchor="middle" font-size="24" font-weight="900" fill="white" font-family="sans-serif">'+pctInt+'%</text>'+
+      '<text x="'+def.x+'" y="'+(cy+r+22)+'" text-anchor="middle" font-size="22" font-weight="800" fill="rgba(0,0,0,0.8)" font-family="sans-serif" stroke="rgba(0,0,0,0.8)" stroke-width="5" stroke-linejoin="round">'+z.made+'/'+z.total+'</text>'+
+      '<text x="'+def.x+'" y="'+(cy+r+22)+'" text-anchor="middle" font-size="22" font-weight="800" fill="white" font-family="sans-serif">'+z.made+'/'+z.total+'</text></g>';
   }).join('');
 
   const madeCount=shots.filter(s=>s.made).length;
@@ -2130,7 +2132,7 @@ function renderShotMap(m, filterPlayerId, filterPeriod, prefix) {
     const {r:cr,g:cg,b:cb,a:ca} = bubbleColor(pct);
     const fill   = `rgba(${cr},${cg},${cb},${ca})`;
     const stroke = `rgba(${cr},${cg},${cb},0.9)`;
-    const cx = def.x, cy = def.y;
+    const cx = def.x, cy = 569 - def.y;
     // label font size adaptive
     // Scale up radius significantly — use 85% of zone half-size as max
     const maxRscaled = Math.min(def.rx, def.ry) * 0.85;
