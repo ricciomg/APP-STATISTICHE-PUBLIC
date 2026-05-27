@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a0a0f">
 <title>CourtStats</title>
 <style>
@@ -1746,71 +1747,11 @@ ${(()=>{
   ];
   return stats.map(s=>`<div style="background:#13131a;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;text-align:center">
     <div style="font-size:18px;margin-bottom:2px">${s.icon}</div>
-    <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">${s.label}</div>
+    <div style="font-size:13px;color:#ccc;font-weight:600;letter-spacing:.3px;margin-bottom:4px">${s.label}</div>
     <div style="font-size:30px;font-weight:900;color:#f0eee8;line-height:1">${s.val}</div>
   </div>`).join('');
 })()}
 </div>
-
-${(()=>{
-  const oppP = m.oppPlayers||[];
-  if(!oppP.length) return '';
-  const oppF = m.oppFouls||{};
-  // Calcola totale falli per ciascun giocatore avversario
-  const oppRows = oppP.map(p=>{
-    const fd = oppF[p.id];
-    let tot=0;
-    if(fd && typeof fd==='object') tot=Object.values(fd).reduce((a,b)=>a+(b||0),0);
-    else if(typeof fd==='number') tot=fd;
-    return {p, tot};
-  }).sort((a,b)=>b.tot-a.tot);
-  const totalOppFouls = oppRows.reduce((a,r)=>a+r.tot,0);
-  return `<h2>Falli Avversari</h2>
-<div style="background:#13131a;border:1px solid rgba(231,76,60,.2);border-radius:12px;padding:14px;margin-bottom:16px">
-  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-    ${oppRows.map(({p,tot})=>`<div style="background:#1c1c27;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:130px">
-      <div style="font-size:22px;font-weight:900;font-family:monospace;color:#f5a623">#${p.num}</div>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#f0eee8">${p.name}</div>
-        <div style="font-size:20px;font-weight:900;color:${tot>=5?'#e74c3c':tot>=3?'#f5a623':'#888'}">${tot} falli${tot>=5?' ⚠️':''}</div>
-      </div>
-    </div>`).join('')}
-  </div>
-  <div style="font-size:12px;color:#888;border-top:1px solid rgba(255,255,255,.06);padding-top:10px">Totale falli avversari: <strong style="color:#f0eee8">${totalOppFouls}</strong></div>
-</div>`;
-})()}
-
-<h2>Box Score per Quarto</h2>
-${(()=>{
-  const pkeys=[];
-  for(let q=1;q<=4;q++) pkeys.push({key:'q'+q,label:'Q'+q});
-  if(m.isOT) for(let o=1;o<=m.otNum;o++) pkeys.push({key:'ot'+o,label:'OT'+o});
-  return pkeys.map(({key,label})=>{
-    const hasData = m.players.some(p=>{ const s=m.stats[p.id]?.[key]; return s&&(s.fg2a+s.fg3a+s.fta+(s.minPlayed||0))>0; });
-    if(!hasData) return '';
-    const prows = m.players.map(p=>{
-      const s=m.stats[p.id]?.[key]||{fg2m:0,fg2a:0,fg3m:0,fg3a:0,ftm:0,fta:0,reb_off:0,reb_def:0,assist:0,steal:0,turnover:0,block:0,block_against:0,foul:0,foul_drawn:0,minPlayed:0};
-      const pts=s.fg2m*2+s.fg3m*3+s.ftm;
-      if(pts===0&&s.reb_off+s.reb_def+s.assist+(s.minPlayed||0)===0) return '';
-      const f2p=s.fg2a>0?Math.round(s.fg2m/s.fg2a*100)+'%':'—';
-      const f3p=s.fg3a>0?Math.round(s.fg3m/s.fg3a*100)+'%':'—';
-      const ftp=s.fta>0?Math.round(s.ftm/s.fta*100)+'%':'—';
-      return '<tr><td>#'+p.num+' '+p.name+'</td><td>'+Math.round(s.minPlayed||0)+"'</td><td><strong style='color:#f5a623'>"+pts+'</strong></td>'
-        +'<td>'+s.fg2m+'/'+s.fg2a+'<br><span class="dim">'+f2p+'</span></td>'
-        +'<td>'+s.fg3m+'/'+s.fg3a+'<br><span class="dim">'+f3p+'</span></td>'
-        +'<td>'+s.ftm+'/'+s.fta+'<br><span class="dim">'+ftp+'</span></td>'
-        +'<td>'+s.reb_off+'</td><td>'+s.reb_def+'</td>'
-        +'<td>'+s.assist+'</td><td>'+(s.steal||0)+'</td><td>'+(s.turnover||0)+'</td><td>'+(s.block||0)+'</td><td>'+(s.block_against||0)+'</td>'
-        +'<td class="'+(s.foul>=5?'red':'')+'">'+s.foul+(s.foul>=5?' ⚠️':'')+'</td>'
-        +'<td>'+(s.foul_drawn||0)+'</td></tr>';
-    }).join('');
-    return '<div class="q-card"><div class="q-title">'+label+'</div>'
-      +'<div class="scroll-wrap" style="margin-bottom:0"><table>'
-      +'<thead><tr><th>Giocatore</th><th>Min</th><th>Pts</th><th>2pt</th><th>3pt</th><th>TL</th>'
-      +'<th>RO</th><th>RD</th><th>Ast</th><th>PR</th><th>PP</th><th>SF</th><th>SS</th><th>FF</th><th>FS</th></tr></thead>'
-      +'<tbody>'+prows+'</tbody></table></div></div>';
-  }).join('');
-})()}
 
 <h2>Mappa Tiri</h2>
 <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1957,6 +1898,66 @@ function updateExportMap() {
 }
 updateExportMap();
 <\/script>
+
+<h2>Box Score per Quarto</h2>
+${(()=>{
+  const pkeys=[];
+  for(let q=1;q<=4;q++) pkeys.push({key:'q'+q,label:'Q'+q});
+  if(m.isOT) for(let o=1;o<=m.otNum;o++) pkeys.push({key:'ot'+o,label:'OT'+o});
+  return pkeys.map(({key,label})=>{
+    const hasData = m.players.some(p=>{ const s=m.stats[p.id]?.[key]; return s&&(s.fg2a+s.fg3a+s.fta+(s.minPlayed||0))>0; });
+    if(!hasData) return '';
+    const prows = m.players.map(p=>{
+      const s=m.stats[p.id]?.[key]||{fg2m:0,fg2a:0,fg3m:0,fg3a:0,ftm:0,fta:0,reb_off:0,reb_def:0,assist:0,steal:0,turnover:0,block:0,block_against:0,foul:0,foul_drawn:0,minPlayed:0};
+      const pts=s.fg2m*2+s.fg3m*3+s.ftm;
+      if(pts===0&&s.reb_off+s.reb_def+s.assist+(s.minPlayed||0)===0) return '';
+      const f2p=s.fg2a>0?Math.round(s.fg2m/s.fg2a*100)+'%':'—';
+      const f3p=s.fg3a>0?Math.round(s.fg3m/s.fg3a*100)+'%':'—';
+      const ftp=s.fta>0?Math.round(s.ftm/s.fta*100)+'%':'—';
+      return '<tr><td>#'+p.num+' '+p.name+'</td><td>'+Math.round(s.minPlayed||0)+"'</td><td><strong style='color:#f5a623'>"+pts+'</strong></td>'
+        +'<td>'+s.fg2m+'/'+s.fg2a+'<br><span class="dim">'+f2p+'</span></td>'
+        +'<td>'+s.fg3m+'/'+s.fg3a+'<br><span class="dim">'+f3p+'</span></td>'
+        +'<td>'+s.ftm+'/'+s.fta+'<br><span class="dim">'+ftp+'</span></td>'
+        +'<td>'+s.reb_off+'</td><td>'+s.reb_def+'</td>'
+        +'<td>'+s.assist+'</td><td>'+(s.steal||0)+'</td><td>'+(s.turnover||0)+'</td><td>'+(s.block||0)+'</td><td>'+(s.block_against||0)+'</td>'
+        +'<td class="'+(s.foul>=5?'red':'')+'">'+s.foul+(s.foul>=5?' ⚠️':'')+'</td>'
+        +'<td>'+(s.foul_drawn||0)+'</td></tr>';
+    }).join('');
+    return '<div class="q-card"><div class="q-title">'+label+'</div>'
+      +'<div class="scroll-wrap" style="margin-bottom:0"><table>'
+      +'<thead><tr><th>Giocatore</th><th>Min</th><th>Pts</th><th>2pt</th><th>3pt</th><th>TL</th>'
+      +'<th>RO</th><th>RD</th><th>Ast</th><th>PR</th><th>PP</th><th>SF</th><th>SS</th><th>FF</th><th>FS</th></tr></thead>'
+      +'<tbody>'+prows+'</tbody></table></div></div>';
+  }).join('');
+})()}
+
+${(()=>{
+  const oppP = m.oppPlayers||[];
+  if(!oppP.length) return '';
+  const oppF = m.oppFouls||{};
+  // Calcola totale falli per ciascun giocatore avversario
+  const oppRows = oppP.map(p=>{
+    const fd = oppF[p.id];
+    let tot=0;
+    if(fd && typeof fd==='object') tot=Object.values(fd).reduce((a,b)=>a+(b||0),0);
+    else if(typeof fd==='number') tot=fd;
+    return {p, tot};
+  }).sort((a,b)=>b.tot-a.tot);
+  const totalOppFouls = oppRows.reduce((a,r)=>a+r.tot,0);
+  return `<h2>Falli Avversari</h2>
+<div style="background:#13131a;border:1px solid rgba(231,76,60,.2);border-radius:12px;padding:14px;margin-bottom:16px">
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+    ${oppRows.map(({p,tot})=>`<div style="background:#1c1c27;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:130px">
+      <div style="font-size:22px;font-weight:900;font-family:monospace;color:#f5a623">#${p.num}</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#f0eee8">${p.name}</div>
+        <div style="font-size:20px;font-weight:900;color:${tot>=5?'#e74c3c':tot>=3?'#f5a623':'#888'}">${tot} falli${tot>=5?' ⚠️':''}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+  <div style="font-size:12px;color:#888;border-top:1px solid rgba(255,255,255,.06);padding-top:10px">Totale falli avversari: <strong style="color:#f0eee8">${totalOppFouls}</strong></div>
+</div>`;
+})()}
 
 ${m.subs.length?`<h2>Sostituzioni</h2>
 <table><thead><tr><th>Periodo</th><th>Entra</th><th>Esce</th><th>Al termine</th></tr></thead>
@@ -3252,6 +3253,13 @@ setInterval(() => { if (driveEnabled) { driveToken = null; driveSync(); } }, 50 
   if(li>=0) liveMatch=li;
   renderRoster(); renderMatches();
 })();
+
+// ═══ AGGIUNTO SU SUGGERIMENTO DI COPILOT PER APK ═══
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+
 </script>
 </body>
 </html>
