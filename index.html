@@ -372,6 +372,23 @@
 </div>
 
 <!-- NAVIGATION -->
+<div class="page" id="page-settings">
+  <div class="page-header" style="position:relative"><div class="page-title">CONFIG</div><div class="page-sub">Configurazione app</div></div>
+  <div style="padding:20px;display:flex;flex-direction:column;gap:20px">
+    <div style="background:var(--surface);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:14px;font-weight:600;color:var(--text1);margin-bottom:4px">🎯 Selezione zona tiro</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Se abilitata, dopo ogni tiro verrà mostrata la mappa del campo per selezionare la zona precisa. Se disabilitata, i punti vengono registrati immediatamente senza aprire la mappa.</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div id="zone-toggle-btn" onclick="toggleZoneSelection()" style="cursor:pointer;width:52px;height:28px;border-radius:14px;position:relative;transition:background .25s;flex-shrink:0"></div>
+        <span id="zone-toggle-label" style="font-size:13px;color:var(--text2)"></span>
+      </div>
+    </div>
+    <div style="background:var(--surface);border-radius:12px;padding:14px">
+      <div style="font-size:11px;color:var(--text3);line-height:1.5">ℹ️ Le impostazioni vengono salvate localmente sul dispositivo. La disabilitazione della mappa velocizza la registrazione delle statistiche durante la partita.</div>
+    </div>
+  </div>
+</div>
+
 <nav>
   <button class="nav-item active" onclick="showPage('roster',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Roster
@@ -384,6 +401,9 @@
   </button>
   <button class="nav-item" onclick="showPage('report',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Report
+  </button>
+  <button class="nav-item" onclick="showPage('settings',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Config
   </button>
   <div style="position:absolute;bottom:2px;right:8px;font-size:9px;color:var(--text3);letter-spacing:.3px;opacity:.6;pointer-events:none">v1.01</div>
   <!--  <div style="position:absolute;bottom:6px;right:10px;font-size:10px;font-weight:600;pointer-events:none">v1.01</div> -->
@@ -757,6 +777,11 @@ if(!state.matches)        state.matches        = [];
 if(!state.deletedMatchIds)  state.deletedMatchIds  = [];
 if(!state.deletedPlayerIds) state.deletedPlayerIds = [];
 
+// ═══ SETTINGS ═══
+let settings = JSON.parse(localStorage.getItem('courtstats4_settings') || '{}');
+if(settings.zoneSelection === undefined) settings.zoneSelection = true;
+function saveSettings() { localStorage.setItem('courtstats4_settings', JSON.stringify(settings)); }
+
 let liveMatch         = null;
 let selectedPlayerIdx = null;
 let pendingShot       = null;
@@ -770,12 +795,13 @@ function showPage(id, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   el.classList.add('active');
-  if(id==='live')    renderLive();
-  if(id==='report')  { populateReportSelect(); renderReport(); }
-  if(id==='roster')  renderRoster();
-  if(id==='matches') renderMatches();
+  if(id==='live')     renderLive();
+  if(id==='report')   { populateReportSelect(); renderReport(); }
+  if(id==='roster')   renderRoster();
+  if(id==='matches')  renderMatches();
+  if(id==='settings') renderSettings();
 }
-function gotoPage(id) { showPage(id, document.querySelectorAll('.nav-item')[{roster:0,matches:1,live:2,report:3}[id]]); }
+function gotoPage(id) { showPage(id, document.querySelectorAll('.nav-item')[{roster:0,matches:1,live:2,report:3,settings:4}[id]]); }
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
@@ -1050,7 +1076,38 @@ function confirmRollback() {
 // ═══ RECORD ACTIONS ═══
 function recordShot(pts,made) {
   if(selectedPlayerIdx===null){ toast('Seleziona un giocatore'); return; }
-  pendingShot={pts,made}; openCourtModal(pts,made);
+  if(settings.zoneSelection) {
+    pendingShot={pts,made}; openCourtModal(pts,made);
+  } else {
+    // Registra direttamente senza aprire la mappa
+    pushUndo();
+    const m=state.matches[liveMatch],p=m.players[selectedPlayerIdx],q=curKey();
+    const deltaType=pts===2?'shot2':'shot3';
+    if(pts===2){ m.stats[p.id][q].fg2a++; if(made){m.stats[p.id][q].fg2m++; m.ourScore+=2;} }
+    else        { m.stats[p.id][q].fg3a++; if(made){m.stats[p.id][q].fg3m++; m.ourScore+=3;} }
+    m.stats[p.id][q].shots.push({pts,made,zone:'N/A',q,sx:null,sy:null});
+    addLog(p,made?'✅':'❌',pts+'pt '+(made?'Segnato':'Sbagliato')+' — zona non registrata',q,
+      {type:deltaType,made,pts:made?pts:0,sx:null,sy:null,zone:'N/A'});
+    save(); renderLive(); toast(made?'✅'+p.name+': +'+pts+' pts! (tot. '+m.ourScore+')':'❌'+p.name+': Sbagliato');
+  }
+}
+
+// ═══ SETTINGS ═══
+function renderSettings() {
+  const on = settings.zoneSelection;
+  const btn = document.getElementById('zone-toggle-btn');
+  const lbl = document.getElementById('zone-toggle-label');
+  if(btn) {
+    btn.style.background = on ? 'var(--accent)' : 'var(--text3)';
+    btn.innerHTML = `<div style="position:absolute;top:3px;left:${on?'27px':'3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left .25s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>`;
+  }
+  if(lbl) lbl.textContent = on ? 'Abilitata — la mappa viene mostrata dopo ogni tiro' : 'Disabilitata — i punti vengono registrati immediatamente';
+}
+function toggleZoneSelection() {
+  settings.zoneSelection = !settings.zoneSelection;
+  saveSettings();
+  renderSettings();
+  toast(settings.zoneSelection ? '🗺️ Selezione zona abilitata' : '⚡ Selezione zona disabilitata');
 }
 function recordFT(made) {
   if(selectedPlayerIdx===null){ toast('Seleziona un giocatore'); return; }
@@ -1060,7 +1117,7 @@ function recordFT(made) {
   if(made){ m.stats[p.id][q].ftm++; m.ourScore++; }
   addLog(p,made?'🎯':'⭕',made?'TL segnato (+1)':'TL sbagliato',q,{type:'ft',made,pts:made?1:0});
   if(made) {
-    toast('🎯 '+p.name+': Tiro Libero Segnato +1', 2500);
+    toast('🎯 '+p.name+': Tiro Libero Segnato +1 (tot. '+m.ourScore+')', 2500);
   } else {
     toast('⭕ '+p.name+': Tiro Libero Sbagliato', 2500);
   }
@@ -1077,7 +1134,7 @@ function recordStat(type) {
   if(type==='foul') {
     const fc = getFoulCount(state.matches[liveMatch], p);
     const warn = fc>=5?' — FUORI!':fc>=4?' — ATTENZIONE!':'';
-    toast('✋ '+p.name+': '+fc+' fallo'+(fc>1?'i':'')+warn, 3000);
+    toast('✋ ' + p.name + ': ' + fc + ' ' + (fc > 1 ? 'falli' : 'fallo') + warn, 3000);
   } else if(type==='foul_drawn') {
     // handled below with opp modal
   } else {
@@ -1447,7 +1504,7 @@ function pickZone(evt, el) {
   document.getElementById('shot-dots').appendChild(dot);
 
   pendingShot=null;
-  setTimeout(()=>{ closeCourtModal(); save(); renderLive(); toast(made?'+'+pts+' pts!':'Sbagliato'); },650);
+  setTimeout(()=>{ closeCourtModal(); save(); renderLive(); toast(made?'+'+pts+' pts! (tot. '+m.ourScore+')':'Sbagliato'); },650);
 }
 
 // ═══ REPORT ═══
@@ -2027,7 +2084,7 @@ function renderReport() {
         })()}
       </select>
     </div>
-    <div id="shot-map-container">${renderShotMap(m, null, null)}</div>
+    <div id="shot-map-container" ${settings.zoneSelection ? '' : 'style="display:none"'}>${settings.zoneSelection ? renderShotMap(m, null, null) : '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">⚙️ Selezione zona disabilitata nelle impostazioni</div>'}</div>
   `;
 }
 
@@ -2713,7 +2770,7 @@ function openPlayerModal(matchId, playerId) {
         ${periodOpts}
       </select>
     </div>
-    <div id="pd-map">${renderShotMap(m, playerId, null, 'pd-')}</div>
+    <div id="pd-map">${settings.zoneSelection ? renderShotMap(m, playerId, null, 'pd-') : '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">⚙️ Selezione zona disabilitata nelle impostazioni</div>'}</div>
   `;
 
   document.getElementById('modal-player').classList.add('open');
