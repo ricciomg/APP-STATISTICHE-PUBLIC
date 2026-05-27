@@ -366,7 +366,7 @@
     <select id="report-match-select" onchange="renderReport()" style="flex:1">
       <option value="">— Seleziona partita —</option>
     </select>
-    <button class="btn btn-ghost btn-sm" onclick="exportReport()" title="Esporta report">📤</button>
+    <button id="report-export-btn" class="btn btn-ghost btn-sm" onclick="exportReport()" title="Esporta report">📤</button>
   </div>
   <div id="report-content"><div class="empty-state"><div class="e-icon">📊</div><p>Seleziona una partita</p></div></div>
 </div>
@@ -383,8 +383,24 @@
         <span id="zone-toggle-label" style="font-size:13px;color:var(--text2)"></span>
       </div>
     </div>
+    <div style="background:var(--surface);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:14px;font-weight:600;color:var(--text1);margin-bottom:4px">👥 Roster avversario</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Se abilitata, quando si registra un fallo subito viene aperta la modale per assegnare il fallo a un giocatore avversario. Se disabilitata, il fallo subito viene registrato immediatamente senza aprire nessuna modale.</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div id="opp-roster-toggle-btn" onclick="toggleOppRoster()" style="cursor:pointer;width:52px;height:28px;border-radius:14px;position:relative;transition:background .25s;flex-shrink:0"></div>
+        <span id="opp-roster-toggle-label" style="font-size:13px;color:var(--text2)"></span>
+      </div>
+    </div>
+    <div style="background:var(--surface);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:14px;font-weight:600;color:var(--text1);margin-bottom:4px">📤 Export report</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Se abilitata, il pulsante di esportazione del report è disponibile nella sezione Report. Se disabilitata, il pulsante viene nascosto e non è possibile esportare i dati.</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div id="export-toggle-btn" onclick="toggleReportExport()" style="cursor:pointer;width:52px;height:28px;border-radius:14px;position:relative;transition:background .25s;flex-shrink:0"></div>
+        <span id="export-toggle-label" style="font-size:13px;color:var(--text2)"></span>
+      </div>
+    </div>
     <div style="background:var(--surface);border-radius:12px;padding:14px">
-      <div style="font-size:11px;color:var(--text3);line-height:1.5">ℹ️ Le impostazioni vengono salvate localmente sul dispositivo. La disabilitazione della mappa velocizza la registrazione delle statistiche durante la partita.</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.5">ℹ️ Le impostazioni vengono salvate localmente sul dispositivo. La disabilitazione della mappa e del roster avversario velocizzano la registrazione delle statistiche durante la partita.</div>
     </div>
   </div>
 </div>
@@ -780,6 +796,8 @@ if(!state.deletedPlayerIds) state.deletedPlayerIds = [];
 // ═══ SETTINGS ═══
 let settings = JSON.parse(localStorage.getItem('courtstats4_settings') || '{}');
 if(settings.zoneSelection === undefined) settings.zoneSelection = true;
+if(settings.oppRosterEnabled === undefined) settings.oppRosterEnabled = true;
+if(settings.reportExportEnabled === undefined) settings.reportExportEnabled = true;
 function saveSettings() { localStorage.setItem('courtstats4_settings', JSON.stringify(settings)); }
 
 let liveMatch         = null;
@@ -796,7 +814,7 @@ function showPage(id, el) {
   document.getElementById('page-'+id).classList.add('active');
   el.classList.add('active');
   if(id==='live')     renderLive();
-  if(id==='report')   { populateReportSelect(); renderReport(); }
+  if(id==='report')   { populateReportSelect(); renderReport(); const eb=document.getElementById('report-export-btn'); if(eb) eb.style.display=settings.reportExportEnabled?'':'none'; }
   if(id==='roster')   renderRoster();
   if(id==='matches')  renderMatches();
   if(id==='settings') renderSettings();
@@ -1102,12 +1120,46 @@ function renderSettings() {
     btn.innerHTML = `<div style="position:absolute;top:3px;left:${on?'27px':'3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left .25s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>`;
   }
   if(lbl) lbl.textContent = on ? 'Abilitata — la mappa viene mostrata dopo ogni tiro' : 'Disabilitata — i punti vengono registrati immediatamente';
+
+  const onOpp = settings.oppRosterEnabled;
+  const btnOpp = document.getElementById('opp-roster-toggle-btn');
+  const lblOpp = document.getElementById('opp-roster-toggle-label');
+  if(btnOpp) {
+    btnOpp.style.background = onOpp ? 'var(--accent)' : 'var(--text3)';
+    btnOpp.innerHTML = `<div style="position:absolute;top:3px;left:${onOpp?'27px':'3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left .25s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>`;
+  }
+  if(lblOpp) lblOpp.textContent = onOpp ? 'Abilitata — la modale avversario si apre al fallo subito' : 'Disabilitata — il fallo subito viene registrato senza modale';
+
+  const onExp = settings.reportExportEnabled;
+  const btnExp = document.getElementById('export-toggle-btn');
+  const lblExp = document.getElementById('export-toggle-label');
+  if(btnExp) {
+    btnExp.style.background = onExp ? 'var(--accent)' : 'var(--text3)';
+    btnExp.innerHTML = `<div style="position:absolute;top:3px;left:${onExp?'27px':'3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left .25s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>`;
+  }
+  if(lblExp) lblExp.textContent = onExp ? 'Abilitata — il pulsante export è visibile nel report' : 'Disabilitata — il pulsante export è nascosto';
+
+  // Aggiorna visibilità pulsante export nel report
+  const exportBtn = document.getElementById('report-export-btn');
+  if(exportBtn) exportBtn.style.display = onExp ? '' : 'none';
 }
 function toggleZoneSelection() {
   settings.zoneSelection = !settings.zoneSelection;
   saveSettings();
   renderSettings();
   toast(settings.zoneSelection ? '🗺️ Selezione zona abilitata' : '⚡ Selezione zona disabilitata');
+}
+function toggleOppRoster() {
+  settings.oppRosterEnabled = !settings.oppRosterEnabled;
+  saveSettings();
+  renderSettings();
+  toast(settings.oppRosterEnabled ? '👥 Roster avversario abilitato' : '⚡ Roster avversario disabilitato');
+}
+function toggleReportExport() {
+  settings.reportExportEnabled = !settings.reportExportEnabled;
+  saveSettings();
+  renderSettings();
+  toast(settings.reportExportEnabled ? '📤 Export report abilitato' : '🔒 Export report disabilitato');
 }
 function recordFT(made) {
   if(selectedPlayerIdx===null){ toast('Seleziona un giocatore'); return; }
@@ -1148,14 +1200,24 @@ function recordStat(type) {
   // Se fallo subito e ci sono avversari nel roster, apri modal per assegnare fallo avversario
   if(type==='foul_drawn') {
     if(!m.oppFouls) m.oppFouls = {};
-    if(m.oppPlayers && m.oppPlayers.length>0) {
-      // Auto-open opp foul modal to assign the foul
-      setTimeout(()=>{ renderOppFoulList(); openModal('modal-opp-foul'); }, 200);
+    if(settings.oppRosterEnabled) {
+      if(m.oppPlayers && m.oppPlayers.length>0) {
+        // Auto-open opp foul modal to assign the foul
+        setTimeout(()=>{ renderOppFoulList(); openModal('modal-opp-foul'); }, 200);
+      } else {
+        // No opp roster yet — prompt to add players
+        setTimeout(()=>{
+          toast('💡 Aggiungi il roster avversario per assegnare il fallo (tasto 👥 Avv.)', 3500);
+        }, 200);
+      }
     } else {
-      // No opp roster yet — prompt to add players
-      setTimeout(()=>{
-        toast('💡 Aggiungi il roster avversario per assegnare il fallo (tasto 👥 Avv.)', 3500);
-      }, 200);
+      // Roster avversario disabilitato: incrementa direttamente il contatore falli avversario
+      if(!m.oppFouls) m.oppFouls = {};
+      const oppFoulKey = '__direct__';
+      m.oppFouls[oppFoulKey] = (m.oppFouls[oppFoulKey] || 0) + 1;
+      renderFoulStrip();
+      save();
+      toast('🙋 Fallo subito registrato', 2000);
     }
   }
 }
@@ -1519,6 +1581,7 @@ function totals(m,p) {
   return a;
 }
 function exportReport() {
+  if(!settings.reportExportEnabled){ toast('⚙️ Export disabilitato nelle impostazioni'); return; }
   const id = parseInt(document.getElementById('report-match-select').value);
   const m  = state.matches.find(x=>x.id===id);
   if(!m){ toast('Seleziona prima una partita'); return; }
@@ -1592,6 +1655,10 @@ function exportReport() {
   .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px}
   .q-card{background:#13131a;border:1px solid rgba(245,166,35,.12);border-radius:10px;padding:12px;margin-bottom:12px}
   .q-title{font-size:16px;font-weight:700;color:#f5a623;margin-bottom:8px;letter-spacing:1px}
+  @media(max-width:480px){
+    div[style*="grid-template-columns:repeat(3,1fr)"]{grid-template-columns:repeat(2,1fr) !important}
+    div[style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:repeat(2,1fr) !important}
+  }
 </style>
 </head>
 <body>
@@ -1626,6 +1693,92 @@ function exportReport() {
   </tbody>
 </table>
 </div>
+
+<h2>Sommario Tiri di Squadra</h2>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+${(()=>{
+  const T=rows.reduce((acc,{all})=>({
+    fg2m:acc.fg2m+all.fg2m, fg2a:acc.fg2a+all.fg2a,
+    fg3m:acc.fg3m+all.fg3m, fg3a:acc.fg3a+all.fg3a,
+    ftm:acc.ftm+all.ftm,    fta:acc.fta+all.fta
+  }),{fg2m:0,fg2a:0,fg3m:0,fg3a:0,ftm:0,fta:0});
+  const fg2pct=T.fg2a>0?Math.round(T.fg2m/T.fg2a*100):0;
+  const fg3pct=T.fg3a>0?Math.round(T.fg3m/T.fg3a*100):0;
+  const ftpct =T.fta >0?Math.round(T.ftm /T.fta *100):0;
+  const fgm=T.fg2m+T.fg3m, fga=T.fg2a+T.fg3a;
+  const fgpct=fga>0?Math.round(fgm/fga*100):0;
+  function pC(v){return v>=50?'#2ecc71':v>=33?'#f5a623':'#e74c3c';}
+  const cards=[
+    {label:'Dal campo (2pt+3pt)',made:fgm,att:fga,pct:fgpct,col:'#f5a623'},
+    {label:'Tiri da 2',          made:T.fg2m,att:T.fg2a,pct:fg2pct,col:'#3498db'},
+    {label:'Tiri da 3',          made:T.fg3m,att:T.fg3a,pct:fg3pct,col:'#e8390e'},
+    {label:'Tiri Liberi',        made:T.ftm, att:T.fta, pct:ftpct, col:'#9b59b6'},
+  ];
+  return cards.map(c=>`<div style="background:#13131a;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;text-align:center">
+    <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">${c.label}</div>
+    <div style="font-size:28px;font-weight:900;color:${c.col};line-height:1">${c.made}/${c.att}</div>
+    <div style="font-size:22px;font-weight:700;color:${pC(c.pct)};margin-top:4px">${c.pct}%</div>
+  </div>`).join('');
+})()}
+</div>
+
+<h2>Totali di Squadra</h2>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+${(()=>{
+  const T=rows.reduce((acc,{all})=>({
+    reb_off:acc.reb_off+(all.reb_off||0),
+    reb_def:acc.reb_def+(all.reb_def||0),
+    assist: acc.assist +(all.assist ||0),
+    steal:  acc.steal  +(all.steal  ||0),
+    turnover:acc.turnover+(all.turnover||0),
+    foul:   acc.foul   +(all.foul   ||0),
+    foul_drawn:acc.foul_drawn+(all.foul_drawn||0),
+  }),{reb_off:0,reb_def:0,assist:0,steal:0,turnover:0,foul:0,foul_drawn:0});
+  const stats=[
+    {icon:'🏀',label:'Rimbalzi Off.',  val:T.reb_off},
+    {icon:'🛡️',label:'Rimbalzi Dif.',  val:T.reb_def},
+    {icon:'↕️',label:'Rimbalzi Tot.',  val:T.reb_off+T.reb_def},
+    {icon:'🎯',label:'Assist',          val:T.assist},
+    {icon:'🫳',label:'Palle Recuperate',val:T.steal},
+    {icon:'💸',label:'Palle Perse',     val:T.turnover},
+    {icon:'✋',label:'Falli Fatti',     val:T.foul},
+    {icon:'🙋',label:'Falli Subiti',    val:T.foul_drawn},
+  ];
+  return stats.map(s=>`<div style="background:#13131a;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;text-align:center">
+    <div style="font-size:18px;margin-bottom:2px">${s.icon}</div>
+    <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">${s.label}</div>
+    <div style="font-size:30px;font-weight:900;color:#f0eee8;line-height:1">${s.val}</div>
+  </div>`).join('');
+})()}
+</div>
+
+${(()=>{
+  const oppP = m.oppPlayers||[];
+  if(!oppP.length) return '';
+  const oppF = m.oppFouls||{};
+  // Calcola totale falli per ciascun giocatore avversario
+  const oppRows = oppP.map(p=>{
+    const fd = oppF[p.id];
+    let tot=0;
+    if(fd && typeof fd==='object') tot=Object.values(fd).reduce((a,b)=>a+(b||0),0);
+    else if(typeof fd==='number') tot=fd;
+    return {p, tot};
+  }).sort((a,b)=>b.tot-a.tot);
+  const totalOppFouls = oppRows.reduce((a,r)=>a+r.tot,0);
+  return `<h2>Falli Avversari</h2>
+<div style="background:#13131a;border:1px solid rgba(231,76,60,.2);border-radius:12px;padding:14px;margin-bottom:16px">
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+    ${oppRows.map(({p,tot})=>`<div style="background:#1c1c27;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:130px">
+      <div style="font-size:22px;font-weight:900;font-family:monospace;color:#f5a623">#${p.num}</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#f0eee8">${p.name}</div>
+        <div style="font-size:20px;font-weight:900;color:${tot>=5?'#e74c3c':tot>=3?'#f5a623':'#888'}">${tot} falli${tot>=5?' ⚠️':''}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+  <div style="font-size:12px;color:#888;border-top:1px solid rgba(255,255,255,.06);padding-top:10px">Totale falli avversari: <strong style="color:#f0eee8">${totalOppFouls}</strong></div>
+</div>`;
+})()}
 
 <h2>Box Score per Quarto</h2>
 ${(()=>{
@@ -2605,9 +2758,15 @@ function renderFoulStrip() {
 
   // OPP fouls this quarter + total match
   let oppQ = 0, oppTot = 0;
-  Object.values(m.oppFouls||{}).forEach(fd=>{
-    oppQ += (fd[qk]||0);
-    allQks.forEach(k=>{ oppTot += (fd[k]||0); });
+  Object.entries(m.oppFouls||{}).forEach(([key, fd])=>{
+    if(key === '__direct__') {
+      // Falli registrati senza roster: contati solo nel totale
+      oppTot += (typeof fd === 'number' ? fd : 0);
+      oppQ   += (typeof fd === 'number' ? fd : 0); // non abbiamo info per quarto, li mostriamo tutti
+    } else {
+      oppQ += (fd[qk]||0);
+      allQks.forEach(k=>{ oppTot += (fd[k]||0); });
+    }
   });
 
   // Render dots for our fouls
